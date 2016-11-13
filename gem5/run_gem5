@@ -1,0 +1,1 @@
+M5_PATH=/backup/khsieh/arm_full_system ./build/ARM/gem5.opt configs/example/fs.py --machine-type=VExpress_EMM64 -n 4 --mem-size=2048MB --disk-image=aarch64-ubuntu-trusty-headless.img --dtb-file=/backup/khsieh/arm_full_system/binaries/vexpress.aarch64.20140821.dtb --kernel=/backup/khsieh/arm_full_system/binaries/vmlinux.aarch64.20140821 -r 2 --caches --l2cache --cpu-type=detailed

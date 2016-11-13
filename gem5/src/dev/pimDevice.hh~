@@ -1,0 +1,67 @@
+#include "dev/io_device.hh"
+#include "params/PimDevice.hh"
+#include "sim/system.hh"
+
+class PimPort : public MasterPort
+{
+ public:
+
+        MemObject* device;
+        System* sys;
+        bool recvTimingResp(PacketPtr pkt);
+        void traverse(Addr phys);
+        PimPort(MemObject *dev, System *s); 
+        const MasterID masterId;
+	void recvRetry() ;
+};
+
+
+class PimDevice : public BasicPioDevice
+
+{
+/*
+protected:
+class PimPort : public MasterPort
+{
+ public:
+
+        PimDevice* device;
+        System* sys;
+        bool recvTimingResp(PacketPtr pkt);
+        void traverse(Addr phys);
+        PimPort(PimDevice *dev, System *s);
+        const MasterID masterId;
+        void recvRetry() ;
+};
+*/
+
+private:
+
+std::string devname;
+
+public:
+
+typedef PimDeviceParams Params;
+protected:
+PimPort pimPort;
+
+const Params * params() const
+{
+
+return dynamic_cast<const Params *>(_params);
+
+}
+
+public:
+PimDevice(Params *p);
+
+virtual Tick read(PacketPtr pkt);
+
+virtual Tick write(PacketPtr pkt);
+
+
+ virtual BaseMasterPort &getMasterPort(const std::string &if_name,
+                                          PortID idx = InvalidPortID);
+};
+
+

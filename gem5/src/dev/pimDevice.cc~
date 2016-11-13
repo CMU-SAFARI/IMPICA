@@ -1,0 +1,109 @@
+#include "dev/pimDevice.hh"
+#include "debug/PIM.hh"
+
+PimPort::PimPort(MemObject *dev, System *s)
+    : MasterPort(dev->name() + ".pim", dev), device(dev),
+      sys(s), masterId(s->getMasterId(dev->name()))
+{ }
+
+void PimPort::traverse(Addr phys)
+{
+    DPRINTF(PIM, "In traverse!\n");
+
+Addr address=phys; 
+int size = 4;
+
+// creating a request
+	Request *req = new Request(address,size, Request::UNCACHEABLE, masterId);
+        req->taskId(ContextSwitchTaskId::Unknown);
+        PacketPtr pkt = new Packet(req,MemCmd::ReadReq);
+// issue request
+	sendTimingReq(pkt);
+}
+
+bool PimPort::recvTimingResp(PacketPtr pkt)
+{
+
+DPRINTF(PIM, "In recvTimingResp! the value of packet: %#X: \n",pkt->get<uint32_t>());
+/*
+  if(findChild())
+  {
+    Addr phys = virtToPhys(pkt->get<>())
+    traverse(phys);
+  }
+  else // findChild()==0 --> it means that this is the leaf node
+  {
+    
+  }
+*/
+return true;
+
+}
+
+void PimPort::recvRetry()
+{
+}
+
+PimDevice::PimDevice(Params *p) : BasicPioDevice(p, p->pio_size), devname(p->devicename), pimPort(this, sys)
+{
+
+//pio_size = 0x10;
+
+}
+
+Tick PimDevice::read(PacketPtr pkt)
+{
+
+Addr daddr = pkt->getAddr() - pioAddr;
+
+assert(pkt->getSize() == 8);
+
+pkt->allocate();
+
+pkt->set((uint64_t)0);
+
+pkt->makeAtomicResponse();
+
+warn("Device %s: Read request at offset %#X", devname, daddr);
+
+return pioDelay;
+
+}
+
+Tick PimDevice::write(PacketPtr pkt)
+{
+
+Addr daddr = pkt->getAddr() - pioAddr;
+Addr phys=0x00;
+// Translate virtual to phys address
+// Tanslate(pkt->get<uint32_t>());
+
+    DPRINTF(PIM, "In writeFunction!\n");
+ warn("Device %s: Write request at offset %#X with value %#X", devname, daddr, pkt->get<uint32_t>());
+
+ //pimPort.traverse(phys);
+
+pkt->makeAtomicResponse();
+
+return pioDelay;
+
+}
+
+PimDevice *PimDeviceParams::create()
+
+{
+
+return new PimDevice(this);
+
+}
+ BaseMasterPort & PimDevice::getMasterPort(const std::string &if_name,
+                                          PortID idx)
+{
+ if (if_name == "pim") {
+        return pimPort;
+    }
+
+    return BasicPioDevice::getMasterPort(if_name, idx);
+
+}
+

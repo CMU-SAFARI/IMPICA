@@ -1,0 +1,7 @@
+M5_PATH=~/arm_full_system ./build/ARM/gem5.opt --redirect-stdout --redirect-stderr --outdir=dbhw5_out configs/example/fs.py --machine-type=VExpress_EMM64 -n 4 --mem-size=2048MB --disk-image=aarch64-ubuntu-trusty-headless.new2.img --dtb-file=/home/khsieh/arm_full_system/binaries/vexpress.aarch64.20140821.dtb --kernel=/home/khsieh/arm_full_system/binaries/vmlinux.aarch64.20140821 -r 1 &
+
+# --caches --l2cache --cpu-type=detailed &
+
+M5_PATH=~/arm_full_system ./build/ARM/gem5.opt --redirect-stdout --redirect-stderr --outdir=dbsw5_out configs/example/fs.py --machine-type=VExpress_EMM64 -n 4 --mem-size=2048MB --disk-image=aarch64-ubuntu-trusty-headless.new2.img --dtb-file=/home/khsieh/arm_full_system/binaries/vexpress.aarch64.20140821.dtb --kernel=/home/khsieh/arm_full_system/binaries/vmlinux.aarch64.20140821 -r 1 &
+
+# --caches --l2cache --cpu-type=detailed &
