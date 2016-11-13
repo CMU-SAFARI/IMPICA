@@ -1,8 +1,13 @@
-#include "dev/arm/pimDevice.hh"
+#include "config/pimDevice.hh"
+
+#if (USE_PIM_DEVICE == PIM_DEVICE_BTREE)
+
+#include "dev/arm/pimDevice_btree.hh"
 #include "debug/PIM.hh"
 #include "debug/PIMMMU.hh"
 #include "base/bitfield.hh"
 
+#define GRAB_PAGE_TABLE   (1)
 
 /*
   PimPort::PimPort(MemObject *dev, System *s)
@@ -159,6 +164,7 @@ PimDevice::PimDevice(Params *p)
 	}
 
 	isPageTableFetched = false;
+	fetchPageTableIndex = 0;
 
 	warn("The number of TLB entry : %d\n", p->pim_tlb_num);
 
@@ -226,7 +232,13 @@ Tick PimDevice::read(PacketPtr pkt)
 		data = (uint32_t)(leafAddr[ch] >> 32);
 		break;
 	case GrabPageTable:
+
+#if (GRAB_PAGE_TABLE)
 		data = (isPageTableFetched) ? 2 : 0;
+#else
+		data = 2;
+#endif
+
 		break;
 
 	default:
@@ -343,7 +355,11 @@ Tick PimDevice::write(PacketPtr pkt)
 		startBtreeTraverse(ch);
 		break;
 	case GrabPageTable:
+
+#if (GRAB_PAGE_TABLE)
 		startGrabPageTable();
+#endif
+
 		break;
 	default:
 		warn("Write to unsupported registers for PIM BT\n");
@@ -363,7 +379,7 @@ void PimDevice::startBtreeTraverse(uint64_t ch)
 	doneTrav[ch] = false;
 	
 	leafAddr[ch] = rootAddr[ch];
-	btNodeCrossPage[ch] = isBtNodeCrossPage(rootAddr[ch]);
+	btNodeCrossPage[ch] = isBtNodeCrossPage(rootAddr[ch]);	
  
 	totalRequest[ch]++;
 	totalTravRequest[ch]++;
@@ -384,10 +400,51 @@ void PimDevice::startGrabPageTable()
 
 	event->setEventTrigger(FetchPageTable, 0);
 
+	fetchPageTableIndex = 0;
+
 	dmaPort.dmaAction(MemCmd::ReadReq, pageTableAddr[0],
 		              sizeof(firstLevelPageTable), event, (uint8_t *) &firstLevelPageTable,
 					  0, Request::PIM_ACCESS); //Request::UNCACHEABLE);
 }
+
+// grab second level page table
+void PimDevice::grabSecondPageTable()
+{
+	if (fetchPageTableIndex >= (PTRS_PER_PUD)) {
+		isPageTableFetched = true;
+		DPRINTF(PIMMMU, "Grab second level page table done");
+		return;
+	}
+
+	while (fetchPageTableIndex < PTRS_PER_PUD) {
+	
+		uint64_t pud_entry = firstLevelPageTable[fetchPageTableIndex];
+
+		if (!pd_none(pud_entry) && !pd_bad(pud_entry) && pd_table(pud_entry)) {
+
+			DmaDoneEvent *event = getFreeDmaDoneEvent();
+
+			event->setEventTrigger(FetchPageTable, 0);
+			
+			dmaPort.dmaAction(MemCmd::ReadReq, 
+							  pg_table_addr(pud_entry),
+							  sizeof(secondLevelPageTable[0]), event, 
+							  (uint8_t *) &secondLevelPageTable[fetchPageTableIndex],
+							  0, Request::PIM_ACCESS); //Request::UNCACHEABLE);
+
+			fetchPageTableIndex++;
+			return;			
+		}
+		fetchPageTableIndex ++;
+	}
+	
+	if (fetchPageTableIndex >= (PTRS_PER_PUD)) {
+		isPageTableFetched = true;
+		DPRINTF(PIMMMU, "Grab second level page table done");
+		return;
+	}
+}
+
 
 
 // whether the address of BT node exceeds a page
@@ -516,28 +573,7 @@ void PimDevice::pageWalkDmaBack(uint64_t eventTrigger, uint64_t ch)
 		firstLevelPageWalkDone(pageWalkDmaBuffer[ch], ch);
 		break;
 	case PageWalkLevel2:
-		assert(!pd_none(pageWalkDmaBuffer[ch]) && !pd_bad(pageWalkDmaBuffer[ch]));
-
-		if (!pd_table(pageWalkDmaBuffer[ch])) {
-			DPRINTF(PIMMMU, "Got block at level 2, PD = %#x\n", pageWalkDmaBuffer[ch]);
-			insertTlbEntry(virtualAddrToTrans[ch] & PMD_MASK,
-						   PMD_SIZE, pageWalkDmaBuffer[ch] & PMD_MASK & PHYS_MASK);
-			physAddr = ((pageWalkDmaBuffer[ch]) & PMD_MASK & PHYS_MASK) 
-				| (virtualAddrToTrans[ch] & ~PMD_MASK);
-			pageWalkDone(physAddr, ch);
-		} else {
-			event = getFreeDmaDoneEvent();
-
-			event->setEventTrigger(PageWalkLevel3, ch);
-
-			descAddr = pte_offset(pageWalkDmaBuffer[ch], virtualAddrToTrans[ch]);
-
-			DPRINTF(PIMMMU, "Go to level 3 table, addr = %#x\n", descAddr);
-
-			dmaPort.dmaAction(MemCmd::ReadReq, descAddr, 
-							  pageWalkDmaSize, event, (uint8_t *) &pageWalkDmaBuffer[ch],
-							  0, Request::PIM_ACCESS); //Request::UNCACHEABLE);		
-		}
+		secondLevelPageWalkDone(pageWalkDmaBuffer[ch], ch);
 		break;
 	case PageWalkLevel3:
 
@@ -563,7 +599,7 @@ void PimDevice::firstLevelPageWalkDone(uint64_t pageTableEntry, uint64_t ch)
 	assert(!pd_none(pageTableEntry) && !pd_bad(pageTableEntry));
 
 	DmaDoneEvent *event;
-	uint64_t descAddr, physAddr;
+	uint64_t virtAddr, descAddr, physAddr;
 
 	if (!pd_table(pageTableEntry)) {
 		DPRINTF(PIMMMU, "Got block at level 1, PD = %#x\n", pageTableEntry);
@@ -573,19 +609,62 @@ void PimDevice::firstLevelPageWalkDone(uint64_t pageTableEntry, uint64_t ch)
 			| (virtualAddrToTrans[ch] & ~PUD_MASK);
 		pageWalkDone(physAddr, ch);
 	} else {
+
+		if (isPageTableFetched) {
+			
+			// Use the grabbed second level page table to go to the next level directly
+			virtAddr = virtualAddrToTrans[ch];
+			uint64_t pmd_entry = 
+				secondLevelPageTable[pud_index(virtAddr)][pmd_index(virtAddr)];
+			secondLevelPageWalkDone(pmd_entry, ch);
+
+		} else {
+
+			event = getFreeDmaDoneEvent();
+
+			event->setEventTrigger(PageWalkLevel2, ch);
+
+			descAddr = pmd_offset(pageTableEntry, virtualAddrToTrans[ch]);
+
+			DPRINTF(PIMMMU, "Go to level 2 table, addr = %#x, ch = %d\n", descAddr, ch);
+
+			dmaPort.dmaAction(MemCmd::ReadReq, descAddr, 
+							  pageWalkDmaSize, event, (uint8_t *) &pageWalkDmaBuffer[ch],
+							  0, Request::PIM_ACCESS); //Request::UNCACHEABLE);		
+		}
+	}
+}
+
+// When second level page walk done, invoke this function
+void PimDevice::secondLevelPageWalkDone(uint64_t pageTableEntry, uint64_t ch)
+{
+	DmaDoneEvent *event;
+	uint64_t descAddr, physAddr;
+	
+	assert(!pd_none(pageTableEntry) && !pd_bad(pageTableEntry));
+
+	if (!pd_table(pageTableEntry)) {
+		DPRINTF(PIMMMU, "Got block at level 2, PD = %#x\n", pageWalkDmaBuffer[ch]);
+		insertTlbEntry(virtualAddrToTrans[ch] & PMD_MASK,
+					   PMD_SIZE, pageTableEntry & PMD_MASK & PHYS_MASK);
+		physAddr = ((pageTableEntry) & PMD_MASK & PHYS_MASK) 
+			| (virtualAddrToTrans[ch] & ~PMD_MASK);
+		pageWalkDone(physAddr, ch);
+	} else {
 		event = getFreeDmaDoneEvent();
 
-		event->setEventTrigger(PageWalkLevel2, ch);
+		event->setEventTrigger(PageWalkLevel3, ch);
 
-		descAddr = pmd_offset(pageTableEntry, virtualAddrToTrans[ch]);
+		descAddr = pte_offset(pageTableEntry, virtualAddrToTrans[ch]);
 
-		DPRINTF(PIMMMU, "Go to level 2 table, addr = %#x, ch = %d\n", descAddr, ch);
+		DPRINTF(PIMMMU, "Go to level 3 table, addr = %#x\n", descAddr);
 
 		dmaPort.dmaAction(MemCmd::ReadReq, descAddr, 
 						  pageWalkDmaSize, event, (uint8_t *) &pageWalkDmaBuffer[ch],
 						  0, Request::PIM_ACCESS); //Request::UNCACHEABLE);		
 	}
 }
+
 
 
 // when page table walk has been done, invoke this function
@@ -737,7 +816,8 @@ void PimDevice::dmaDone(uint64_t eventTrigger, uint64_t ch)
 		fetchBtNodeBack(ch);
 		break;
 	case FetchPageTable:
-		isPageTableFetched = true;
+		//isPageTableFetched = true;
+		grabSecondPageTable();
 		break;
 	default:
 		//		assert(0);
@@ -898,3 +978,4 @@ PimDevice *PimDeviceParams::create()
 }
 
 
+#endif

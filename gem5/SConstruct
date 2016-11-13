@@ -1096,6 +1096,10 @@ Export('protocol_dirs')
 slicc_includes = []
 Export('slicc_includes')
 
+# For PIM Device
+pim_device_list = []
+Export('pim_device_list')
+
 # Walk the tree and execute all SConsopts scripts that wil add to the
 # above variables
 if GetOption('verbose'):
@@ -1131,12 +1135,13 @@ sticky_vars.AddVariables(
     BoolVariable('USE_KVM', 'Enable hardware virtualized (KVM) CPU models', have_kvm),
     EnumVariable('PROTOCOL', 'Coherence protocol for Ruby', 'None',
                   all_protocols),
+    EnumVariable('PIM_DEVICE', 'PIM device type', 'btree', pim_device_list),
     )
 
 # These variables get exported to #defines in config/*.hh (see src/SConscript).
 export_vars += ['USE_FENV', 'SS_COMPATIBLE_FP', 'TARGET_ISA', 'CP_ANNOTATE',
                 'USE_POSIX_CLOCK', 'PROTOCOL', 'HAVE_PROTOBUF',
-                'HAVE_PERF_ATTR_EXCLUDE_HOST']
+                'HAVE_PERF_ATTR_EXCLUDE_HOST', 'PIM_DEVICE']
 
 ###################################################
 #

@@ -407,6 +407,53 @@ def makeTheISA(source, target, env):
 env.Command('config/the_isa.hh', map(Value, all_isa_list),
             MakeAction(makeTheISA, Transform("CFG ISA", 0)))
 
+
+def makePimDevice(source, target, env):
+    pim_devices = [ src.get_contents() for src in source ]
+    use_pim_device = env['PIM_DEVICE']
+    def define(pd):
+        return 'PIM_DEVICE_' + pd.upper()
+    
+    def namespace(pd):
+        return 'Pim_Device_' + pd[0].upper() + pd[1:].lower()
+
+
+    code = code_formatter()
+    code('''\
+#ifndef __CONFIG_PIM_DEVICE_HH__
+#define __CONFIG_PIM_DEVICE_HH__
+
+''')
+
+    # create defines for the preprocessing and compile-time determination
+    for i,pd in enumerate(pim_devices):
+        code('#define $0 $1', define(pd), i + 1)
+    code()
+
+    # create an enum for any run-time determination of the ISA, we
+    # reuse the same name as the namespaces
+    code('enum class PimDeviceEnum {')
+    for i,pd in enumerate(pim_devices):
+        if i + 1 == len(pim_devices):
+            code('  $0 = $1', namespace(pd), define(pd))
+        else:
+            code('  $0 = $1,', namespace(pd), define(pd))
+    code('};')
+
+    code('''
+
+#define USE_PIM_DEVICE ${{define(use_pim_device)}}
+#define UsePimDevice ${{namespace(use_pim_device)}}
+#define USE_PIM_DEVICE_STR "${{use_pim_device}}"
+
+#endif // __CONFIG_PIM_DEVICE_HH__''')
+
+    code.write(str(target[0]))
+
+env.Command('config/pimDevice.hh', map(Value, pim_device_list),
+            MakeAction(makePimDevice, Transform("CFG PIM DEVICE", 0)))
+
+
 ########################################################################
 #
 # Prevent any SimObjects from being added after this point, they

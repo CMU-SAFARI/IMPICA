@@ -35,44 +35,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# Authors: Ali Saidi
+# Authors: Kevin Hsieh
 
 Import('*')
 
-if env['TARGET_ISA'] == 'arm':
-    SimObject('Gic.py')
-    SimObject('RealView.py')
-    SimObject('EnergyCtrl.py')
-
-    Source('a9scu.cc')
-    Source('amba_device.cc')
-    Source('amba_fake.cc')
-    Source('base_gic.cc')
-    Source('generic_timer.cc')
-    Source('gic_pl390.cc')
-    Source('pl011.cc')
-    Source('pl111.cc')
-    Source('hdlcd.cc')
-    Source('kmi.cc')
-    Source('timer_sp804.cc')
-    Source('rv_ctrl.cc')
-    Source('realview.cc')
-    Source('rtc_pl031.cc')
-    Source('timer_cpulocal.cc')
-    Source('vgic.cc')
-    Source('energy_ctrl.cc')
-    Source('pimDevice_btree.cc')
-    Source('pimDevice_hashtable.cc')
-    Source('pimDevice_linklist.cc')
-
-
-    DebugFlag('AMBA')
-    DebugFlag('HDLcd')
-    DebugFlag('PL111')
-    DebugFlag('Pl050')
-    DebugFlag('GIC')
-    DebugFlag('RVCTRL')
-    DebugFlag('EnergyCtrl')
-    DebugFlag('VGIC')
-    DebugFlag('PIM')
-    DebugFlag('PIMMMU')
+pim_device_list.append('btree')
+pim_device_list.append('hash_table')
+pim_device_list.append('link_list')
