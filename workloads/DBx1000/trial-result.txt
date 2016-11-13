@@ -1,0 +1,6 @@
+PASS! SimTime = 299833820
+[tid=0] txn_cnt=9149,abort_cnt=0
+[tid=1] txn_cnt=9025,abort_cnt=0
+[tid=2] txn_cnt=10000,abort_cnt=0
+[tid=3] txn_cnt=9679,abort_cnt=0
+[summary] txn_cnt=37853, abort_cnt=0, run_time=1.180069, time_wait=0.001224, time_ts_alloc=0.000000, time_man=0.304555, time_index=0.378894, time_abort=0.000000, time_cleanup=0.058851, latency=0.000031, deadlock_cnt=0, cycle_detect=1742, dl_detect_time=0.000440, dl_wait_time=0.000000, time_query=0.002966, debug1=0.010188, debug2=0.000000, debug3=0.026036, debug4=0.000000, debug5=0.021292
