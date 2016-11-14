@@ -7,8 +7,11 @@ This repo consists of the simulator and the workloads for IMPICA (In-Memory PoIn
 ## Folder structure
 
 gem5: The main gem5-based simulator.
+
 linux-aarch64-gem5-20140821: The Linux kernel code.
+
 pim_driver: The Linux kernel driver for IMPICA.
+
 workloads: The evaluated workloads.
 
 ## Build the simulator and driver
