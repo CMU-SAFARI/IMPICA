@@ -40,7 +40,7 @@ Follow the tutorial to prepare the disk image.
 http://gem5.org/Ubuntu_Disk_Image_for_ARM_Full_System
 ```
 
-Example of prepareing the disk image by putting the driver (pim_driver) and workloads into it. 
+This is an example to put the driver (pim_driver) and workloads into the disk image. 
 
 ```
 mount -oloop,offset=32256 aarch64-ubuntu-trusty-headless.img /mnt
