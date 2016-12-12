@@ -14,11 +14,31 @@ pim_driver: The Linux kernel driver for IMPICA.
 
 workloads: The evaluated workloads.
 
+## System prerequisites
+
+The system needs to be able to build gem5 and the Linux kernel for ARM. Please refer to:
+
+```
+http://www.gem5.org/Dependencies
+https://wiki.linaro.org/Resources/HowTo/KernelDeploy#A3_-_Build_the_Kernel
+```
+
+If using Ubuntu, the dependecies are
+
+```
+sudo apt-get install libncurses5-dev gcc make git exuberant-ctags bc libssl-dev python-dev scons m4 build-essential g++ swig zlib-dev
+```
+
 ## Build the simulator and driver
 
 ```
 cd gem5
 scons -j8 PIM_DEVICE=btree build/ARM.gem5.opt
+
+cd linux-aarch64-gem5-20140821
+make menuconfig
+make dep
+make -j
 
 cd pim_driver
 make
